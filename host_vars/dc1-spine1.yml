@@ -1,0 +1,3 @@
+---
+custom_structured_configuration_banners:
+  motd: "host_vars work!"
