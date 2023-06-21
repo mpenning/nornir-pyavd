@@ -1,60 +1,65 @@
 from nornir import InitNornir
 import pyavd
-import os
+import difflib
+from nornir.core.task import Task, Result
+from nornir_utils.plugins.functions import print_result
 
-# Initialize Nornir object from config_file
-nr = InitNornir(config_file="config.yml")
+def build_config(task: Task, eos_designs, avd_facts):
+    structured_config = pyavd.get_device_structured_config(task.host.name, eos_designs[task.host.name], avd_facts=avd_facts)
+    config = pyavd.get_device_config(task.host.name, structured_config)
 
-hostvars = {}
+    task.host.data["designed-config"] = config
+    return Result(host=task.host)
 
-for hostname in nr.inventory.hosts:
-    host = nr.inventory.hosts[hostname]
+def pull_config(task: Task):
+    with open(f'configs/{task.host.name}.cfg', "r") as f:
+        task.host.data["running-config"] = f.read()
+    return Result(host=task.host)
 
-    # Using .dict() or .data was not getting the group variables
-    data = host.items()
-    res = {}
-    for (k, v) in data:
-        res[k] = v
+def diff_config(task: Task):
+    changed = False
+    diff = ""
+    for line in difflib.unified_diff(task.host.data["running-config"].split("\n"), task.host.data["designed-config"].split("\n"), fromfile='running-config', tofile='designed-config', lineterm=''):
+        diff += f'{line}\n'
+        changed = True
+    return Result(host=task.host, diff=diff, changed=changed)
 
-    hostvars[hostname] = res
+def deploy_config(task: Task):
+    with open(f'configs/{task.host.name}.cfg', "w") as f:
+        f.write(task.host.data["designed-config"])
+    return Result(host=task.host, changed=True)
 
-# Validate input and convert types as needed
-pyavd.validate_inputs(hostvars)
+def config_management(task: Task, eos_designs, avd_facts):
+    task.run(task=build_config, eos_designs=eos_designs, avd_facts=avd_facts)
+    task.run(task=pull_config)
+    result = task.run(task=diff_config)[0]
+    if result.changed:
+        task.run(task=deploy_config)
 
-# Generate facts
-avd_facts = pyavd.get_avd_facts(hostvars)
-structured_configs = {
-    hostname: pyavd.get_device_structured_config(
-        hostname, hostvars[hostname], avd_facts
-    )
-    for hostname in hostvars
-}
-configs = {
-    hostname: pyavd.get_device_config(hostname, structured_configs[hostname])
-    for hostname in structured_configs
-}
+def run():
+    # Initialize Nornir object from config_file
+    nr = InitNornir(config_file="config.yml")
 
-docs = {
-    hostname: pyavd.get_device_doc(hostname, structured_configs[hostname])
-    for hostname in structured_configs
-}
+    eos_designs = {}
 
-# Ensure the 'configs' directory exists
-if not os.path.exists("configs"):
-    os.makedirs("configs")
+    for hostname in nr.inventory.hosts:
+        host = nr.inventory.hosts[hostname]
 
-# Ensure the 'docs' directory exists
-if not os.path.exists("docs"):
-    os.makedirs("docs")
+        # Using .dict() or .data was not getting the group variables
+        data = host.items()
+        res = {}
+        for (k, v) in data:
+            res[k] = v
 
-for hostname, config in configs.items():
-    config_path = f"configs/{hostname}.cfg"
-    doc_path = f"docs/{hostname}.md"
+        eos_designs[hostname] = res
 
-    with open(doc_path, "w") as file:
-        file.write(docs[hostname])
+    # Validate input and convert types as needed
+    pyavd.validate_inputs(eos_designs)
 
-    with open(config_path, "w") as file:
-        file.write(config)
+    # Generate facts
+    avd_facts = pyavd.get_avd_facts(eos_designs)
 
-    print(f"Written config and docs for {hostname}")
+    output = nr.run(task=config_management, eos_designs=eos_designs, avd_facts=avd_facts)
+    print_result(output)
+
+run()
