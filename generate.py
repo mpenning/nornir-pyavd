@@ -34,16 +34,27 @@ configs = {
     for hostname in structured_configs
 }
 
+docs = {
+    hostname: pyavd.get_device_doc(hostname, structured_configs[hostname])
+    for hostname in structured_configs
+}
+
 # Ensure the 'configs' directory exists
 if not os.path.exists("configs"):
     os.makedirs("configs")
 
+# Ensure the 'docs' directory exists
+if not os.path.exists("docs"):
+    os.makedirs("docs")
+
 for hostname, config in configs.items():
     config_path = f"configs/{hostname}.cfg"
+    doc_path = f"docs/{hostname}.md"
+
+    with open(doc_path, "w") as file:
+        file.write(docs[hostname])
+
     with open(config_path, "w") as file:
         file.write(config)
 
-    # Get byte count of the file
-    byte_count = os.path.getsize(config_path)
-
-    print(f"Written config for {hostname} to {config_path}, byte count: {byte_count}")
+    print(f"Written config and docs for {hostname}")
