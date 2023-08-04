@@ -4,6 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+pyavd = "*"
+nornir = "*"
+nornir-utils = "*"
+nornir-ansible = "*"
 
 [dev-packages]
 

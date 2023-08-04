@@ -6,7 +6,7 @@ from nornir_utils.plugins.functions import print_result
 
 def build_config(task: Task, eos_designs, avd_facts):
     structured_config = pyavd.get_device_structured_config(task.host.name, eos_designs[task.host.name], avd_facts=avd_facts)
-    config = pyavd.get_device_config(task.host.name, structured_config)
+    config = pyavd.get_device_config(structured_config)
 
     task.host.data["designed-config"] = config
     return Result(host=task.host)
@@ -54,7 +54,17 @@ def run():
         eos_designs[hostname] = res
 
     # Validate input and convert types as needed
-    pyavd.validate_inputs(eos_designs)
+    failures = False
+    for host in eos_designs:
+        hostvars = eos_designs[host]
+
+        results = pyavd.validate_inputs(hostvars)
+        if results.failed:
+            for result in results.validation_errors:
+                print(result)
+            failures = True
+    if failures:
+        exit(1)
 
     # Generate facts
     avd_facts = pyavd.get_avd_facts(eos_designs)
