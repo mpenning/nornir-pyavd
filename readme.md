@@ -1,1 +1,0 @@
-## Using pyavd with Nornir to generate configuration files
