@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nornir-pyavd"
+version = "0.0.2"
+description = "Build Arista configs with Nornir and pyavd"
+license = "MIT"
+dependencies = [
+"pyavd==5.2.0",
+"nornir==3.5.0",
+"nornir-utils==0.2.0",
+"nornir-ansible==2023.12.28",
+"loguru>=0.7.2"
+]
+
+[tool.setuptools.packages.find]
+include = ["generate.py"]
+exclude = ["group_vars", "host_vars", "configs"]
